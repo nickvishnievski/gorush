@@ -199,18 +199,29 @@ Retry:
 	res, err := client.SendMessage(context.Background(), notification)
 	if err != nil {
 		// Send Message error
-		errLog := logPush(cfg, core.FailedPush, req.To, req, err)
-		resp.Logs = append(resp.Logs, errLog)
+		for _, token := range req.Tokens {
+			errLog := logPush(cfg, core.FailedPush, token, req, err)
+			resp.Logs = append(resp.Logs, errLog)
+		}
 		logx.LogError.Error("HMS server send message error: " + err.Error())
 		return
 	}
 
 	// Huawei Push Send API does not support exact results for each token
+	// Error codes: https://developer.huawei.com/consumer/en/doc/development/HMSCore-Guides/commonerror-0000001059816656
 	if res.Code == "80000000" {
 		status.StatStorage.AddHuaweiSuccess(int64(1))
+		for _, token := range req.Tokens {
+			successLog := logPush(cfg, core.SucceededPush, token, req, nil)
+			resp.Logs = append(resp.Logs, successLog)
+		}
 		logx.LogAccess.Debug("Huwaei Send Notification is completed successfully!")
 	} else {
 		isError = true
+		for _, token := range req.Tokens {
+			errLog := logPush(cfg, core.FailedPush, token, req, errors.New(res.Code+" "+res.Msg))
+			resp.Logs = append(resp.Logs, errLog)
+		}
 		status.StatStorage.AddHuaweiError(int64(1))
 		logx.LogAccess.Debug("Huawei Send Notification is failed! Code: " + res.Code)
 	}
