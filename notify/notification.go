@@ -13,7 +13,7 @@ import (
 	"github.com/appleboy/gorush/logx"
 
 	"github.com/appleboy/go-fcm"
-	"github.com/golang-queue/queue"
+	qcore "github.com/golang-queue/queue/core"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/msalihkarakasli/go-hms-push/push/model"
 )
@@ -101,21 +101,22 @@ type PushNotification struct {
 	FastAppTarget      int                        `json:"fast_app_target,omitempty"`
 
 	// iOS
-	Expiration  *int64   `json:"expiration,omitempty"`
-	ApnsID      string   `json:"apns_id,omitempty"`
-	CollapseID  string   `json:"collapse_id,omitempty"`
-	Topic       string   `json:"topic,omitempty"`
-	PushType    string   `json:"push_type,omitempty"`
-	Badge       *int     `json:"badge,omitempty"`
-	Category    string   `json:"category,omitempty"`
-	ThreadID    string   `json:"thread-id,omitempty"`
-	URLArgs     []string `json:"url-args,omitempty"`
-	Alert       Alert    `json:"alert,omitempty"`
-	Production  bool     `json:"production,omitempty"`
-	Development bool     `json:"development,omitempty"`
-	SoundName   string   `json:"name,omitempty"`
-	SoundVolume float32  `json:"volume,omitempty"`
-	Apns        D        `json:"apns,omitempty"`
+	Expiration        *int64   `json:"expiration,omitempty"`
+	ApnsID            string   `json:"apns_id,omitempty"`
+	CollapseID        string   `json:"collapse_id,omitempty"`
+	Topic             string   `json:"topic,omitempty"`
+	PushType          string   `json:"push_type,omitempty"`
+	Badge             *int     `json:"badge,omitempty"`
+	Category          string   `json:"category,omitempty"`
+	ThreadID          string   `json:"thread-id,omitempty"`
+	URLArgs           []string `json:"url-args,omitempty"`
+	Alert             Alert    `json:"alert,omitempty"`
+	Production        bool     `json:"production,omitempty"`
+	Development       bool     `json:"development,omitempty"`
+	SoundName         string   `json:"name,omitempty"`
+	SoundVolume       float32  `json:"volume,omitempty"`
+	Apns              D        `json:"apns,omitempty"`
+	InterruptionLevel string   `json:"interruption_level,omitempty"` // ref: https://github.com/sideshow/apns2/blob/54928d6193dfe300b6b88dad72b7e2ae138d4f0a/payload/builder.go#L7-L24
 }
 
 // Bytes for queue message
@@ -233,7 +234,7 @@ func CheckPushConf(cfg *config.ConfYaml) error {
 }
 
 // SendNotification send notification
-func SendNotification(req queue.QueuedMessage, cfg *config.ConfYaml) (resp *ResponsePush, err error) {
+func SendNotification(req qcore.QueuedMessage, cfg *config.ConfYaml) (resp *ResponsePush, err error) {
 	v, ok := req.(*PushNotification)
 	if !ok {
 		if err = json.Unmarshal(req.Bytes(), &v); err != nil {
@@ -263,8 +264,8 @@ func SendNotification(req queue.QueuedMessage, cfg *config.ConfYaml) (resp *Resp
 }
 
 // Run send notification
-var Run = func(cfg *config.ConfYaml) func(ctx context.Context, msg queue.QueuedMessage) error {
-	return func(ctx context.Context, msg queue.QueuedMessage) error {
+var Run = func(cfg *config.ConfYaml) func(ctx context.Context, msg qcore.QueuedMessage) error {
+	return func(ctx context.Context, msg qcore.QueuedMessage) error {
 		_, err := SendNotification(msg, cfg)
 		return err
 	}
