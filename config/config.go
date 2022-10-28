@@ -308,6 +308,7 @@ func LoadConf(confPath ...string) (*ConfYaml, error) {
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	if len(confPath) > 0 && confPath[0] != "" {
+		fmt.Println("Using config file from args:", confPath[0])
 		content, err := ioutil.ReadFile(confPath[0])
 		if err != nil {
 			return conf, err
@@ -327,6 +328,7 @@ func LoadConf(confPath ...string) (*ConfYaml, error) {
 		if err := viper.ReadInConfig(); err == nil {
 			fmt.Println("Using config file:", viper.ConfigFileUsed())
 		} else if err := viper.ReadConfig(bytes.NewBuffer(defaultConf)); err != nil {
+			fmt.Println("Loading config failed:", err, ". Using default config")
 			// load default config
 			return conf, err
 		}

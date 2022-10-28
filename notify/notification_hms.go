@@ -109,8 +109,11 @@ func GetHuaweiNotification(req *PushNotification) (*model.MessageRequest, error)
 	msgRequest.Message.Android.FastAppTarget = req.FastAppTarget
 
 	// Add data fields
+	// NV: See https://developer.huawei.com/consumer/en/doc/development/HMSCore-Guides/harmony-java-devguides-0000001199425951#section1076611206494
+	// The data is transferred in /message/android/data and not /message/data
+	// The messages with /message/data payload didn't work as expected, when notification is tapped on the device
 	if len(req.HuaweiData) > 0 {
-		msgRequest.Message.Data = req.HuaweiData
+		msgRequest.Message.Android.Data = req.HuaweiData
 	}
 
 	// Notification Message
