@@ -331,6 +331,7 @@ func main() {
 	case core.Redis:
 		w = redisdb.NewWorker(
 			redisdb.WithAddr(cfg.Queue.Redis.Addr),
+			redisdb.WithPassword(cfg.Queue.Redis.Password),
 			redisdb.WithStreamName(cfg.Queue.Redis.StreamName),
 			redisdb.WithGroup(cfg.Queue.Redis.Group),
 			redisdb.WithConsumer(cfg.Queue.Redis.Consumer),

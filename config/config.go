@@ -244,6 +244,7 @@ type SectionNATS struct {
 // SectionRedisQueue is sub section of config.
 type SectionRedisQueue struct {
 	Addr       string `yaml:"addr"`
+	Password   string `yaml:"password"`
 	StreamName string `yaml:"stream_name"`
 	Group      string `yaml:"group"`
 	Consumer   string `yaml:"consumer"`
@@ -408,6 +409,7 @@ func LoadConf(confPath ...string) (*ConfYaml, error) {
 	conf.Queue.NATS.Subj = viper.GetString("queue.nats.subj")
 	conf.Queue.NATS.Queue = viper.GetString("queue.nats.queue")
 	conf.Queue.Redis.Addr = viper.GetString("queue.redis.addr")
+	conf.Queue.Redis.Password = viper.GetString("queue.redis.password")
 	conf.Queue.Redis.StreamName = viper.GetString("queue.redis.stream_name")
 	conf.Queue.Redis.Group = viper.GetString("queue.redis.group")
 	conf.Queue.Redis.Consumer = viper.GetString("queue.redis.consumer")
