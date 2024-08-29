@@ -4,44 +4,46 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/appleboy/gorush/storage"
+	"github.com/appleboy/gorush/core"
 
-	"github.com/appleboy/gorush/config"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestBadgerEngine(t *testing.T) {
 	var val int64
 
-	cfg, _ := config.LoadConf()
-
-	badger := New(cfg)
+	badger := New("")
 	err := badger.Init()
 	assert.Nil(t, err)
 
-	badger.Add(storage.HuaweiSuccessKey, 10)
-	val = badger.Get(storage.HuaweiSuccessKey)
+	// reset the value of the key to 0
+	badger.Set(core.HuaweiSuccessKey, 0)
+	val = badger.Get(core.HuaweiSuccessKey)
+	assert.Equal(t, int64(0), val)
+
+	badger.Add(core.HuaweiSuccessKey, 10)
+	val = badger.Get(core.HuaweiSuccessKey)
 	assert.Equal(t, int64(10), val)
-	badger.Add(storage.HuaweiSuccessKey, 10)
-	val = badger.Get(storage.HuaweiSuccessKey)
+	badger.Add(core.HuaweiSuccessKey, 10)
+	val = badger.Get(core.HuaweiSuccessKey)
 	assert.Equal(t, int64(20), val)
 
-	badger.Set(storage.HuaweiSuccessKey, 0)
-	val = badger.Get(storage.HuaweiSuccessKey)
+	badger.Set(core.HuaweiSuccessKey, 0)
+	val = badger.Get(core.HuaweiSuccessKey)
 	assert.Equal(t, int64(0), val)
 
 	// test concurrency issues
 	var wg sync.WaitGroup
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 100; i++ {
 		wg.Add(1)
 		go func() {
-			badger.Add(storage.HuaweiSuccessKey, 1)
-			wg.Done()
+			defer wg.Done()
+			badger.Add(core.HuaweiSuccessKey, 1)
 		}()
 	}
 	wg.Wait()
-	val = badger.Get(storage.HuaweiSuccessKey)
-	assert.Equal(t, int64(10), val)
+	val = badger.Get(core.HuaweiSuccessKey)
+	assert.Equal(t, int64(100), val)
 
 	assert.NoError(t, badger.Close())
 }

@@ -4,8 +4,8 @@ import (
 	"errors"
 
 	"github.com/appleboy/gorush/config"
+	"github.com/appleboy/gorush/core"
 	"github.com/appleboy/gorush/logx"
-	"github.com/appleboy/gorush/storage"
 	"github.com/appleboy/gorush/storage/badger"
 	"github.com/appleboy/gorush/storage/boltdb"
 	"github.com/appleboy/gorush/storage/buntdb"
@@ -57,20 +57,35 @@ type HuaweiStatus struct {
 func InitAppStatus(conf *config.ConfYaml) error {
 	logx.LogAccess.Info("Init App Status Engine as ", conf.Stat.Engine)
 
-	var store storage.Storage
+	var store core.Storage
+	//nolint:goconst
 	switch conf.Stat.Engine {
 	case "memory":
 		store = memory.New()
 	case "redis":
-		store = redis.New(conf)
+		store = redis.New(
+			conf.Stat.Redis.Addr,
+			conf.Stat.Redis.Password,
+			conf.Stat.Redis.DB,
+			conf.Stat.Redis.Cluster,
+		)
 	case "boltdb":
-		store = boltdb.New(conf)
+		store = boltdb.New(
+			conf.Stat.BoltDB.Path,
+			conf.Stat.BoltDB.Bucket,
+		)
 	case "buntdb":
-		store = buntdb.New(conf)
+		store = buntdb.New(
+			conf.Stat.BuntDB.Path,
+		)
 	case "leveldb":
-		store = leveldb.New(conf)
+		store = leveldb.New(
+			conf.Stat.LevelDB.Path,
+		)
 	case "badger":
-		store = badger.New(conf)
+		store = badger.New(
+			conf.Stat.BadgerDB.Path,
+		)
 	default:
 		logx.LogError.Error("storage error: can't find storage driver")
 		return errors.New("can't find storage driver")

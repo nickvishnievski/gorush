@@ -159,6 +159,7 @@ func autoTLSServer(cfg *config.ConfYaml, q *queue.Queue) *http.Server {
 		Cache:      autocert.DirCache(cfg.Core.AutoTLS.Folder),
 	}
 
+	//nolint:gosec
 	return &http.Server{
 		Addr:      ":https",
 		TLSConfig: &tls.Config{GetCertificate: m.GetCertificate},
@@ -222,7 +223,11 @@ func routerEngine(cfg *config.ConfYaml, q *queue.Queue) *gin.Engine {
 }
 
 // markFailedNotification adds failure logs for all tokens in push notification
-func markFailedNotification(cfg *config.ConfYaml, notification *notify.PushNotification, reason string) []logx.LogPushEntry {
+func markFailedNotification(
+	cfg *config.ConfYaml,
+	notification *notify.PushNotification,
+	reason string,
+) []logx.LogPushEntry {
 	logx.LogError.Error(reason)
 	logs := make([]logx.LogPushEntry, 0)
 	for _, token := range notification.Tokens {
@@ -242,7 +247,12 @@ func markFailedNotification(cfg *config.ConfYaml, notification *notify.PushNotif
 }
 
 // HandleNotification add notification to queue list.
-func handleNotification(ctx context.Context, cfg *config.ConfYaml, req notify.RequestPush, q *queue.Queue) (int, []logx.LogPushEntry) {
+func handleNotification(
+	_ context.Context,
+	cfg *config.ConfYaml,
+	req notify.RequestPush,
+	q *queue.Queue,
+) (int, []logx.LogPushEntry) {
 	var count int
 	wg := sync.WaitGroup{}
 	newNotification := []*notify.PushNotification{}
@@ -280,7 +290,7 @@ func handleNotification(ctx context.Context, cfg *config.ConfYaml, req notify.Re
 			func(msg *notify.PushNotification, cfg *config.ConfYaml) {
 				if err := q.QueueTask(func(ctx context.Context) error {
 					defer wg.Done()
-					resp, err := notify.SendNotification(msg, cfg)
+					resp, err := notify.SendNotification(ctx, msg, cfg)
 					if err != nil {
 						return err
 					}
@@ -302,7 +312,7 @@ func handleNotification(ctx context.Context, cfg *config.ConfYaml, req notify.Re
 
 		count += len(notification.Tokens)
 		// Count topic message
-		if notification.To != "" {
+		if notification.Topic != "" {
 			count++
 		}
 	}

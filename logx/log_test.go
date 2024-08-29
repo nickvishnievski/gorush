@@ -11,13 +11,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var invalidLevel = "invalid"
+
 func TestSetLogLevel(t *testing.T) {
 	log := logrus.New()
 
 	err := SetLogLevel(log, "debug")
 	assert.Nil(t, err)
 
-	err = SetLogLevel(log, "invalid")
+	err = SetLogLevel(log, invalidLevel)
 	assert.Equal(t, "not a valid logrus Level: \"invalid\"", err.Error())
 }
 
@@ -49,7 +51,7 @@ func TestInitDefaultLog(t *testing.T) {
 		cfg.Log.ErrorLog,
 	))
 
-	cfg.Log.AccessLevel = "invalid"
+	cfg.Log.AccessLevel = invalidLevel
 
 	assert.NotNil(t, InitLog(
 		cfg.Log.AccessLevel,
@@ -71,7 +73,7 @@ func TestInitDefaultLog(t *testing.T) {
 func TestAccessLevel(t *testing.T) {
 	cfg, _ := config.LoadConf()
 
-	cfg.Log.AccessLevel = "invalid"
+	cfg.Log.AccessLevel = invalidLevel
 
 	assert.NotNil(t, InitLog(
 		cfg.Log.AccessLevel,
@@ -84,7 +86,7 @@ func TestAccessLevel(t *testing.T) {
 func TestErrorLevel(t *testing.T) {
 	cfg, _ := config.LoadConf()
 
-	cfg.Log.ErrorLevel = "invalid"
+	cfg.Log.ErrorLevel = invalidLevel
 
 	assert.NotNil(t, InitLog(
 		cfg.Log.AccessLevel,
@@ -152,6 +154,10 @@ func TestLogPushEntry(t *testing.T) {
 	in.Token = "1234567890"
 	in.HideToken = true
 	assert.Equal(t, "**********", GetLogPushEntry(&in).Token)
+
+	in.Message = "hellothisisamessage"
+	in.HideMessage = true
+	assert.Equal(t, "(message redacted)", GetLogPushEntry(&in).Message)
 }
 
 func TestLogPush(t *testing.T) {

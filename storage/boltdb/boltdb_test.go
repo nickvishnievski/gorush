@@ -4,30 +4,32 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/appleboy/gorush/storage"
+	"github.com/appleboy/gorush/core"
 
-	"github.com/appleboy/gorush/config"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestBoltDBEngine(t *testing.T) {
 	var val int64
 
-	cfg, _ := config.LoadConf()
-
-	boltDB := New(cfg)
+	boltDB := New("", "gorush")
 	err := boltDB.Init()
 	assert.Nil(t, err)
 
-	boltDB.Add(storage.HuaweiSuccessKey, 10)
-	val = boltDB.Get(storage.HuaweiSuccessKey)
+	// reset the value of the key to 0
+	boltDB.Set(core.HuaweiSuccessKey, 0)
+	val = boltDB.Get(core.HuaweiSuccessKey)
+	assert.Equal(t, int64(0), val)
+
+	boltDB.Add(core.HuaweiSuccessKey, 10)
+	val = boltDB.Get(core.HuaweiSuccessKey)
 	assert.Equal(t, int64(10), val)
-	boltDB.Add(storage.HuaweiSuccessKey, 10)
-	val = boltDB.Get(storage.HuaweiSuccessKey)
+	boltDB.Add(core.HuaweiSuccessKey, 10)
+	val = boltDB.Get(core.HuaweiSuccessKey)
 	assert.Equal(t, int64(20), val)
 
-	boltDB.Set(storage.HuaweiSuccessKey, 0)
-	val = boltDB.Get(storage.HuaweiSuccessKey)
+	boltDB.Set(core.HuaweiSuccessKey, 0)
+	val = boltDB.Get(core.HuaweiSuccessKey)
 	assert.Equal(t, int64(0), val)
 
 	// test concurrency issues
@@ -35,12 +37,12 @@ func TestBoltDBEngine(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
 		go func() {
-			boltDB.Add(storage.HuaweiSuccessKey, 1)
+			boltDB.Add(core.HuaweiSuccessKey, 1)
 			wg.Done()
 		}()
 	}
 	wg.Wait()
-	val = boltDB.Get(storage.HuaweiSuccessKey)
+	val = boltDB.Get(core.HuaweiSuccessKey)
 	assert.Equal(t, int64(10), val)
 
 	assert.NoError(t, boltDB.Close())

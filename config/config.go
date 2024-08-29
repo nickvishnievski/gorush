@@ -3,7 +3,7 @@ package config
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"runtime"
 	"strings"
 
@@ -19,9 +19,13 @@ core:
   worker_num: 0 # default worker number is runtime.NumCPU()
   queue_num: 0 # default queue number is 8192
   max_notification: 100
-  sync: false # set true if you need get error message from fail push notification in API response.
-  feedback_hook_url: "" # set webhook url if you need get error message asynchronously from fail push notification in API response.
+  # set true if you need get error message from fail push notification in API response.
+  # It only works when the queue engine is local.
+  sync: false
+  # set webhook url if you need get error message asynchronously from fail push notification in API response.
+  feedback_hook_url: ""
   feedback_timeout: 10 # default is 10 second
+  feedback_header:
   mode: "release"
   ssl: false
   cert_path: "cert.pem"
@@ -53,7 +57,8 @@ api:
 
 android:
   enabled: true
-  apikey: "YOUR_API_KEY"
+  key_path: "" # path to fcm key file
+  credential: "" # fcm credential data
   max_retry: 0 # resend fail notification, default value zero is disabled
 
 huawei:
@@ -97,6 +102,7 @@ log:
   error_log: "stderr" # stderr: output to console, or define log path like "log/error_log"
   error_level: "error"
   hide_token: true
+  hide_messages: false
 
 stat:
   engine: "memory" # support memory, redis, boltdb, buntdb or leveldb
@@ -146,10 +152,12 @@ type SectionCore struct {
 	CertBase64      string         `yaml:"cert_base64"`
 	KeyBase64       string         `yaml:"key_base64"`
 	HTTPProxy       string         `yaml:"http_proxy"`
-	FeedbackURL     string         `yaml:"feedback_hook_url"`
-	FeedbackTimeout int64          `yaml:"feedback_timeout"`
 	PID             SectionPID     `yaml:"pid"`
 	AutoTLS         SectionAutoTLS `yaml:"auto_tls"`
+
+	FeedbackURL     string   `yaml:"feedback_hook_url"`
+	FeedbackTimeout int64    `yaml:"feedback_timeout"`
+	FeedbackHeader  []string `yaml:"feedback_header"`
 }
 
 // SectionAutoTLS support Let's Encrypt setting.
@@ -172,9 +180,10 @@ type SectionAPI struct {
 
 // SectionAndroid is sub section of config.
 type SectionAndroid struct {
-	Enabled  bool   `yaml:"enabled"`
-	APIKey   string `yaml:"apikey"`
-	MaxRetry int    `yaml:"max_retry"`
+	Enabled    bool   `yaml:"enabled"`
+	KeyPath    string `yaml:"key_path"`
+	Credential string `yaml:"credential"`
+	MaxRetry   int    `yaml:"max_retry"`
 }
 
 // SectionHuawei is sub section of config.
@@ -201,12 +210,13 @@ type SectionIos struct {
 
 // SectionLog is sub section of config.
 type SectionLog struct {
-	Format      string `yaml:"format"`
-	AccessLog   string `yaml:"access_log"`
-	AccessLevel string `yaml:"access_level"`
-	ErrorLog    string `yaml:"error_log"`
-	ErrorLevel  string `yaml:"error_level"`
-	HideToken   bool   `yaml:"hide_token"`
+	Format       string `yaml:"format"`
+	AccessLog    string `yaml:"access_log"`
+	AccessLevel  string `yaml:"access_level"`
+	ErrorLog     string `yaml:"error_log"`
+	ErrorLevel   string `yaml:"error_level"`
+	HideToken    bool   `yaml:"hide_token"`
+	HideMessages bool   `yaml:"hide_messages"`
 }
 
 // SectionStat is sub section of config.
@@ -310,7 +320,7 @@ func LoadConf(confPath ...string) (*ConfYaml, error) {
 
 	if len(confPath) > 0 && confPath[0] != "" {
 		fmt.Println("Using config file from args:", confPath[0])
-		content, err := ioutil.ReadFile(confPath[0])
+		content, err := os.ReadFile(confPath[0])
 		if err != nil {
 			return conf, err
 		}
@@ -346,6 +356,7 @@ func LoadConf(confPath ...string) (*ConfYaml, error) {
 	conf.Core.Sync = viper.GetBool("core.sync")
 	conf.Core.FeedbackURL = viper.GetString("core.feedback_hook_url")
 	conf.Core.FeedbackTimeout = int64(viper.GetInt("core.feedback_timeout"))
+	conf.Core.FeedbackHeader = viper.GetStringSlice("core.feedback_header")
 	conf.Core.SSL = viper.GetBool("core.ssl")
 	conf.Core.CertPath = viper.GetString("core.cert_path")
 	conf.Core.KeyPath = viper.GetString("core.key_path")
@@ -371,7 +382,8 @@ func LoadConf(confPath ...string) (*ConfYaml, error) {
 
 	// Android
 	conf.Android.Enabled = viper.GetBool("android.enabled")
-	conf.Android.APIKey = viper.GetString("android.apikey")
+	conf.Android.KeyPath = viper.GetString("android.key_path")
+	conf.Android.Credential = viper.GetString("android.credential")
 	conf.Android.MaxRetry = viper.GetInt("android.max_retry")
 
 	// Huawei
@@ -399,6 +411,7 @@ func LoadConf(confPath ...string) (*ConfYaml, error) {
 	conf.Log.ErrorLog = viper.GetString("log.error_log")
 	conf.Log.ErrorLevel = viper.GetString("log.error_level")
 	conf.Log.HideToken = viper.GetBool("log.hide_token")
+	conf.Log.HideMessages = viper.GetBool("log.hide_messages")
 
 	// Queue Engine
 	conf.Queue.Engine = viper.GetString("queue.engine")

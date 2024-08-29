@@ -1,39 +1,35 @@
 package buntdb
 
 import (
-	"os"
 	"sync"
 	"testing"
 
-	"github.com/appleboy/gorush/storage"
+	"github.com/appleboy/gorush/core"
 
-	"github.com/appleboy/gorush/config"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestBuntDBEngine(t *testing.T) {
 	var val int64
 
-	cfg, _ := config.LoadConf()
-
-	if _, err := os.Stat(cfg.Stat.BuntDB.Path); os.IsNotExist(err) {
-		err := os.RemoveAll(cfg.Stat.BuntDB.Path)
-		assert.Nil(t, err)
-	}
-
-	buntDB := New(cfg)
+	buntDB := New("")
 	err := buntDB.Init()
 	assert.Nil(t, err)
 
-	buntDB.Add(storage.HuaweiSuccessKey, 10)
-	val = buntDB.Get(storage.HuaweiSuccessKey)
+	// reset the value of the key to 0
+	buntDB.Set(core.HuaweiSuccessKey, 0)
+	val = buntDB.Get(core.HuaweiSuccessKey)
+	assert.Equal(t, int64(0), val)
+
+	buntDB.Add(core.HuaweiSuccessKey, 10)
+	val = buntDB.Get(core.HuaweiSuccessKey)
 	assert.Equal(t, int64(10), val)
-	buntDB.Add(storage.HuaweiSuccessKey, 10)
-	val = buntDB.Get(storage.HuaweiSuccessKey)
+	buntDB.Add(core.HuaweiSuccessKey, 10)
+	val = buntDB.Get(core.HuaweiSuccessKey)
 	assert.Equal(t, int64(20), val)
 
-	buntDB.Set(storage.HuaweiSuccessKey, 0)
-	val = buntDB.Get(storage.HuaweiSuccessKey)
+	buntDB.Set(core.HuaweiSuccessKey, 0)
+	val = buntDB.Get(core.HuaweiSuccessKey)
 	assert.Equal(t, int64(0), val)
 
 	// test concurrency issues
@@ -41,12 +37,12 @@ func TestBuntDBEngine(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
 		go func() {
-			buntDB.Add(storage.HuaweiSuccessKey, 1)
+			buntDB.Add(core.HuaweiSuccessKey, 1)
 			wg.Done()
 		}()
 	}
 	wg.Wait()
-	val = buntDB.Get(storage.HuaweiSuccessKey)
+	val = buntDB.Get(core.HuaweiSuccessKey)
 	assert.Equal(t, int64(10), val)
 
 	assert.NoError(t, buntDB.Close())

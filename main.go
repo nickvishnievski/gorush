@@ -28,6 +28,7 @@ import (
 	redisdb "github.com/golang-queue/redisdb-stream"
 )
 
+//nolint:gocyclo
 func main() {
 	opts := config.ConfYaml{}
 
@@ -52,8 +53,7 @@ func main() {
 	flag.StringVar(&opts.Ios.TeamID, "team-id", "", "iOS Team ID for P8 token")
 	flag.StringVar(&opts.Ios.Password, "P", "", "iOS certificate password for gorush")
 	flag.StringVar(&opts.Ios.Password, "password", "", "iOS certificate password for gorush")
-	flag.StringVar(&opts.Android.APIKey, "k", "", "Android api key configuration for gorush")
-	flag.StringVar(&opts.Android.APIKey, "apikey", "", "Android api key configuration for gorush")
+	flag.StringVar(&opts.Android.KeyPath, "fcm-key", "", "FCM key path configuration for gorush")
 	flag.StringVar(&opts.Huawei.AppSecret, "hk", "", "Huawei api key configuration for gorush")
 	flag.StringVar(&opts.Huawei.AppSecret, "hmskey", "", "Huawei api key configuration for gorush")
 	flag.StringVar(&opts.Huawei.AppID, "hid", "", "HMS app id configuration for gorush")
@@ -81,7 +81,8 @@ func main() {
 	flag.Usage = usage
 	flag.Parse()
 
-	router.SetVersion(Version)
+	router.SetVersion(version)
+	router.SetCommit(commit)
 
 	// Show version and exit
 	if showVersion {
@@ -116,8 +117,8 @@ func main() {
 		cfg.Ios.Password = opts.Ios.Password
 	}
 
-	if opts.Android.APIKey != "" {
-		cfg.Android.APIKey = opts.Android.APIKey
+	if opts.Android.KeyPath != "" {
+		cfg.Android.KeyPath = opts.Android.KeyPath
 	}
 
 	if opts.Huawei.AppSecret != "" {
@@ -159,15 +160,18 @@ func main() {
 
 	if cfg.Core.HTTPProxy != "" {
 		err = notify.SetProxy(cfg.Core.HTTPProxy)
-
 		if err != nil {
 			logx.LogError.Fatalf("Set Proxy error: %v", err)
 		}
 	}
 
+	g := graceful.NewManager(
+		graceful.WithLogger(logx.QueueLogger()),
+	)
+
 	if ping {
-		if err := pinger(cfg); err != nil {
-			logx.LogError.Warnf("ping server error: %v", err)
+		if err := pinger(g.ShutdownContext(), cfg); err != nil {
+			logx.LogError.Fatal(err)
 		}
 		return
 	}
@@ -183,24 +187,19 @@ func main() {
 
 		// send message to single device
 		if token != "" {
-			req.Tokens = []string{token}
+			req.To = token
 		}
 
 		// send topic message
 		if topic != "" {
-			req.To = topic
-		}
-
-		err := notify.CheckMessage(req)
-		if err != nil {
-			logx.LogError.Fatal(err)
+			req.Topic = topic
 		}
 
 		if err := status.InitAppStatus(cfg); err != nil {
 			return
 		}
 
-		if _, err := notify.PushToAndroid(req, cfg); err != nil {
+		if _, err := notify.PushToAndroid(g.ShutdownContext(), req, cfg); err != nil {
 			return
 		}
 
@@ -235,7 +234,7 @@ func main() {
 			return
 		}
 
-		if _, err := notify.PushToHuawei(req, cfg); err != nil {
+		if _, err := notify.PushToHuawei(g.ShutdownContext(), req, cfg); err != nil {
 			return
 		}
 
@@ -274,11 +273,11 @@ func main() {
 			return
 		}
 
-		if err := notify.InitAPNSClient(cfg); err != nil {
+		if err := notify.InitAPNSClient(g.ShutdownContext(), cfg); err != nil {
 			return
 		}
 
-		if _, err := notify.PushToIOS(req, cfg); err != nil {
+		if _, err := notify.PushToIOS(g.ShutdownContext(), req, cfg); err != nil {
 			return
 		}
 
@@ -348,10 +347,6 @@ func main() {
 		queue.WithLogger(logx.QueueLogger()),
 	)
 
-	g := graceful.NewManager(
-		graceful.WithLogger(logx.QueueLogger()),
-	)
-
 	g.AddShutdownJob(func() error {
 		// logx.LogAccess.Info("close the queue system, current queue usage: ", q.Usage())
 		// stop queue system and wait job completed
@@ -365,13 +360,13 @@ func main() {
 	})
 
 	if cfg.Ios.Enabled {
-		if err = notify.InitAPNSClient(cfg); err != nil {
+		if err = notify.InitAPNSClient(g.ShutdownContext(), cfg); err != nil {
 			logx.LogError.Fatal(err)
 		}
 	}
 
 	if cfg.Android.Enabled {
-		if _, err = notify.InitFCMClient(cfg, cfg.Android.APIKey); err != nil {
+		if _, err = notify.InitFCMClient(g.ShutdownContext(), cfg); err != nil {
 			logx.LogError.Fatal(err)
 		}
 	}
@@ -394,7 +389,10 @@ func main() {
 }
 
 // Version control for notify.
-var Version = "No Version Provided"
+var (
+	version = "No Version Provided"
+	commit  = "No Commit Provided"
+)
 
 var usageStr = `
   ________                              .__
@@ -424,11 +422,11 @@ iOS Options:
     --ios                            enabled iOS (default: false)
     --production                     iOS production mode (default: false)
 Android Options:
-    -k, --apikey <api_key>           Android API Key
+    --fcm-key <fcm_key_path>         FCM Credentials Key Path
     --android                        enabled android (default: false)
 Huawei Options:
     -hk, --hmskey <hms_key>          HMS App Secret
-    -hid, --hmsid <hms_id>			 HMS App ID
+    -hid, --hmsid <hms_id>           HMS App ID
     --huawei                         enabled huawei (default: false)
 Common Options:
     --topic <topic>                  iOS, Android or Huawei topic message
@@ -443,7 +441,7 @@ func usage() {
 
 // handles pinging the endpoint and returns an error if the
 // agent is in an unhealthy state.
-func pinger(cfg *config.ConfYaml) error {
+func pinger(ctx context.Context, cfg *config.ConfYaml) error {
 	transport := &http.Transport{
 		Dial: (&net.Dialer{
 			Timeout: 5 * time.Second,
@@ -454,7 +452,13 @@ func pinger(cfg *config.ConfYaml) error {
 		Timeout:   time.Second * 10,
 		Transport: transport,
 	}
-	resp, err := client.Get("http://localhost:" + cfg.Core.Port + cfg.API.HealthURI)
+	req, _ := http.NewRequestWithContext(
+		ctx,
+		http.MethodGet,
+		"http://localhost:"+cfg.Core.Port+cfg.API.HealthURI,
+		nil,
+	)
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}

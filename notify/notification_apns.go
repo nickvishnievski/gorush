@@ -1,6 +1,7 @@
 package notify
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/tls"
 	"encoding/base64"
@@ -30,6 +31,12 @@ var (
 	tcpKeepAlive    = 60 * time.Second
 )
 
+const (
+	dotP8  = ".p8"
+	dotPEM = ".pem"
+	dotP12 = ".p12"
+)
+
 var doOnce sync.Once
 
 // DialTLS is the default dial function for creating TLS connections for
@@ -52,7 +59,7 @@ type Sound struct {
 }
 
 // InitAPNSClient use for initialize APNs Client.
-func InitAPNSClient(cfg *config.ConfYaml) error {
+func InitAPNSClient(ctx context.Context, cfg *config.ConfYaml) error {
 	if cfg.Ios.Enabled {
 		var err error
 		var authKey *ecdsa.PrivateKey
@@ -63,11 +70,11 @@ func InitAPNSClient(cfg *config.ConfYaml) error {
 			ext = filepath.Ext(cfg.Ios.KeyPath)
 
 			switch ext {
-			case ".p12":
+			case dotP12:
 				certificateKey, err = certificate.FromP12File(cfg.Ios.KeyPath, cfg.Ios.Password)
-			case ".pem":
+			case dotPEM:
 				certificateKey, err = certificate.FromPemFile(cfg.Ios.KeyPath, cfg.Ios.Password)
-			case ".p8":
+			case dotP8:
 				authKey, err = token.AuthKeyFromFile(cfg.Ios.KeyPath)
 			default:
 				err = errors.New("wrong certificate key extension")
@@ -87,11 +94,11 @@ func InitAPNSClient(cfg *config.ConfYaml) error {
 				return err
 			}
 			switch ext {
-			case ".p12":
+			case dotP12:
 				certificateKey, err = certificate.FromP12Bytes(key, cfg.Ios.Password)
-			case ".pem":
+			case dotPEM:
 				certificateKey, err = certificate.FromPemBytes(key, cfg.Ios.Password)
-			case ".p8":
+			case dotP8:
 				authKey, err = token.AuthKeyFromBytes(key)
 			default:
 				err = errors.New("wrong certificate key type")
@@ -104,9 +111,9 @@ func InitAPNSClient(cfg *config.ConfYaml) error {
 			}
 		}
 
-		if ext == ".p8" {
+		if ext == dotP8 {
 			if cfg.Ios.KeyID == "" || cfg.Ios.TeamID == "" {
-				msg := "You should provide ios.KeyID and ios.TeamID for P8 token"
+				msg := "you should provide ios.KeyID and ios.TeamID for p8 token"
 				logx.LogError.Error(msg)
 				return errors.New(msg)
 			}
@@ -154,11 +161,13 @@ func newApnsClient(cfg *config.ConfYaml, certificate tls.Certificate) (*apns2.Cl
 		return client, nil
 	}
 
+	//nolint:gosec
 	tlsConfig := &tls.Config{
 		Certificates: []tls.Certificate{certificate},
 	}
 
 	if len(certificate.Certificate) > 0 {
+		//nolint:staticcheck
 		tlsConfig.BuildNameToCertificate()
 	}
 
@@ -306,7 +315,7 @@ func GetIOSNotification(req *PushNotification) *apns2.Notification {
 	if len(req.Priority) > 0 {
 		if req.Priority == "normal" {
 			notification.Priority = apns2.PriorityLow
-		} else if req.Priority == "high" {
+		} else if req.Priority == HIGH {
 			notification.Priority = apns2.PriorityHigh
 		}
 	}
@@ -393,7 +402,7 @@ func getApnsClient(cfg *config.ConfYaml, req *PushNotification) (client *apns2.C
 }
 
 // PushToIOS provide send notification to APNs server.
-func PushToIOS(req *PushNotification, cfg *config.ConfYaml) (resp *ResponsePush, err error) {
+func PushToIOS(ctx context.Context, req *PushNotification, cfg *config.ConfYaml) (resp *ResponsePush, err error) {
 	logx.LogAccess.Debug("Start push notification for iOS")
 
 	var (
@@ -422,7 +431,7 @@ Retry:
 			notification.DeviceToken = token
 
 			// send ios notification
-			res, err := client.Push(&notification)
+			res, err := client.PushWithContext(ctx, &notification)
 			if err != nil || (res != nil && res.StatusCode != http.StatusOK) {
 				if err == nil {
 					// error message:
