@@ -334,6 +334,7 @@ func main() {
 			redisdb.WithStreamName(cfg.Queue.Redis.StreamName),
 			redisdb.WithGroup(cfg.Queue.Redis.Group),
 			redisdb.WithConsumer(cfg.Queue.Redis.Consumer),
+			redisdb.WithMaxLength(cfg.Core.QueueNum),
 			redisdb.WithRunFunc(notify.Run(cfg)),
 			redisdb.WithLogger(logx.QueueLogger()),
 		)
